@@ -5,6 +5,8 @@ let controls;
 let mesh;
 let renderer;
 let scene;
+const mixers = [];
+const clock = new THREE.Clock();
 
 function createControls() {
     controls = new THREE.OrbitControls(camera, container);
@@ -16,12 +18,12 @@ function createCamera() {
     const fov = 35;
     const aspect = container.clientWidth / container.clientHeight;
     const near = 0.1;
-    const far = 100;
+    const far = 200;
 
     // create the camera
     camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     // move the camera a bit back
-    camera.position.set(-4, -4, 10);
+    camera.position.set(-5, 1.5, 150);
 
 }
 
@@ -39,87 +41,22 @@ function createLights() {
     // scene.add(ambientLight);
 }
 
-function createMaterials() {
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff3333, flatShading: true });
-    bodyMaterial.color.convertSRGBToLinear();
+function loadModels() {
+    const loader = new THREE.GLTFLoader();
 
-    const detailMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, flatShading: true });
-    detailMaterial.color.convertSRGBToLinear();
+    const onLoad = (gltf, position) => {
+        const model = gltf.scene.children[0];
+        model.position.copy(position);
+        const animation = gltf.animations[0];
+        const mixer = new THREE.AnimationMixer(model);
+        mixers.push(mixer);
+        const action = mixer.clipAction(animation);
+        action.play();
+        scene.add(model);
+    };
 
-    return {
-        bodyMaterial,
-        detailMaterial,
-    }
-}
-
-function createGeometries() {
-    const nose = new THREE.CylinderBufferGeometry(0.75, 0.75, 3, 12);
-    const cabin = new THREE.BoxBufferGeometry(2, 2.25, 1.5);
-    const chimney = new THREE.CylinderBufferGeometry(0.3, 0.1, 0.5);
-    const wheel = new THREE.CylinderBufferGeometry(0.4, 0.4, 1.75, 16); // can be reused
-    wheel.rotateX(Math.PI / 2);
-
-    return {
-        nose,
-        cabin,
-        chimney,
-        wheel,
-    }
-}
-
-function createMeshes() {
-    // const geometry = new THREE.BoxBufferGeometry(2, 2, 2);
-    // const textureLoader = new THREE.TextureLoader();
-    // const texture = textureLoader.load('textures/uv_test_bw.png');
-    // texture.encoding = THREE.sRGBEncoding;
-    // texture.anisotropy = 2;
-    // const material = new THREE.MeshStandardMaterial({ map: texture });
-    // create a mesh and add it to the scene
-    // mesh = new THREE.Mesh(geometry, material);
-    // scene.add(mesh);
-
-    // create a Group to hold the pieces of the train
-    const train = new THREE.Group();
-    scene.add(train);
-
-    const materials = createMaterials();
-    const geometries = createGeometries();
-
-    const nose = new THREE.Mesh(geometries.nose, materials.bodyMaterial);
-    nose.rotation.z = Math.PI / 2;
-    nose.position.x = -1;
-
-    const cabin = new THREE.Mesh(geometries.cabin, materials.bodyMaterial);
-    cabin.position.set(1.5, 0.4, 0);
-
-    const chimney = new THREE.Mesh(geometries.chimney, materials.detailMaterial);
-    chimney.position.set(-2, 0.9, 0);
-
-    const smallWheelRear = new THREE.Mesh(geometries.wheel, materials.detailMaterial);
-    smallWheelRear.position.set(0, -0.5, 0);
-
-    const smallWheelCenter = smallWheelRear.clone();
-    smallWheelCenter.position.x = -1;
-
-    const smallWheelFront = smallWheelRear.clone();
-    smallWheelFront.position.x = -2;
-
-    const bigWheel = smallWheelRear.clone();
-    bigWheel.scale.set(2, 2, 1.25);
-    bigWheel.position.set(1.5, -0.1, 0);
-
-    train.add(
-
-        nose,
-        cabin,
-        chimney,
-    
-        smallWheelRear,
-        smallWheelCenter,
-        smallWheelFront,
-        bigWheel,
-    
-      );
+    const parrotPosition = new THREE.Vector3(0, 0, 2.5);
+    loader.load('models/Parrot.glb', gltf => onLoad(gltf, parrotPosition));
 }
 
 function createRenderer() {
@@ -144,8 +81,8 @@ function init() {
     createCamera();
     createControls();
     createLights();
-    createMeshes();
     createRenderer();
+    loadModels();
 
     // start animation loop
     renderer.setAnimationLoop(() => {
@@ -155,10 +92,11 @@ function init() {
 }
 
 function update() {
-    // mesh.rotation.x += 0.01;
-    // mesh.rotation.y += 0.01;
-    // mesh.rotation.z += 0.01;
+    const delta = clock.getDelta();
 
+    for (const m of mixers) {
+        m.update(delta);
+    }
 }
 
 function render() {
